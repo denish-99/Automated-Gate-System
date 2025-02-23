@@ -1,55 +1,64 @@
-#include <Servo.h> // Include the Servo library to control a servo motor
+#include <NewPing.h>
+#include <Servo.h> // Include the Servo library
 
-Servo myservo; // Create a servo object to control the servo motor
+// Define ultrasonic sensor pins
+#define TRIG_PIN 12
+#define ECHO_PIN 13
+#define BUZZER_PIN 8
+#define MAX_DISTANCE 200 // Maximum range (in cm)
+#define SERVO_PIN 9
 
-int pos = 0; // Variable to store the position of the servo motor (angle in degrees)
-int cm = 0;  // Variable to store the distance measured by the ultrasonic sensor
+// Create a NewPing object to interact with the ultrasonic sensor
+NewPing sonar(TRIG_PIN, ECHO_PIN, MAX_DISTANCE);
 
-// Function to read distance from the ultrasonic sensor
-long readUltrasonicDistance(int triggerPin, int echoPin)
-{
-    pinMode(triggerPin, OUTPUT);    // Set the trigger pin as an output
-    digitalWrite(triggerPin, LOW);  // Ensure trigger pin is low before sending a pulse
-    delayMicroseconds(2);           // Wait for 2 microseconds
-    digitalWrite(triggerPin, HIGH); // Send a 10 microsecond HIGH pulse to trigger the ultrasonic sensor
-    delayMicroseconds(10);          // Wait for 10 microseconds
-    digitalWrite(triggerPin, LOW);  // Set the trigger pin back to LOW after the pulse
-
-    pinMode(echoPin, INPUT);       // Set the echo pin as an input to receive the pulse
-    return pulseIn(echoPin, HIGH); // Measure the time it takes to receive the pulse back (echo time)
-}
+// Create a Servo object to control the servo motor
+Servo myServo;
 
 void setup()
 {
-    digitalWrite(12, LOW); // Set pin 12 to LOW (could be for some external device, though it's unused here)
-    myservo.attach(9);     // Attach the servo motor to pin 9
-    Serial.begin(9600);    // Start the serial communication at 9600 baud rate for debugging
+    // Initialize serial communication at 9600 baud rate
+    Serial.begin(9600);
+
+    // Give some time to initialize the serial monitor
+    delay(200);
+
+    // Set the buzzer pin as output
+    pinMode(BUZZER_PIN, OUTPUT);
+
+    // Attach the servo to the defined pin (Servo control)
+    myServo.attach(SERVO_PIN);
+    myServo.write(60);
+
+    // Print a startup message
+    Serial.println("Sensor started and active");
 }
 
 void loop()
 {
-    // Calculate the distance in cm using the ultrasonic sensor by multiplying the echo time
-    cm = 0.01723 * readUltrasonicDistance(6, 7); // Pins 6 and 7 are used for the trigger and echo of the ultrasonic sensor
+    // Measure the distance from the ultrasonic sensor
+    int distance = sonar.ping_cm();
 
-    if (cm < 30)
-    {                         // If the measured distance is less than 30 cm
-        Serial.print(cm);     // Print the measured distance to the Serial Monitor
-        Serial.println("cm"); // Print "cm" after the distance value for clarity
-
-        // Rotate the servo from 0 degrees to 120 degrees in steps of 1 degree
-        for (pos = 0; pos <= 120; pos += 1)
-        {
-            myservo.write(pos); // Set the servo motor to the current 'pos' value
-            delay(15);          // Delay 15 milliseconds to control the speed of the servo movement
-        }
-        delay(500); // Wait for 500 milliseconds before moving the servo back
-
-        // Rotate the servo back from 120 degrees to 0 degrees in steps of 1 degree
-        for (pos = 120; pos >= 0; pos -= 1)
-        {
-            myservo.write(pos); // Set the servo motor to the current 'pos' value
-            delay(15);          // Delay 15 milliseconds to control the speed of the servo movement
-        }
-        delay(5000); // Wait for 5000 milliseconds (5 seconds) before checking the distance again
+    // Check if the sensor has detected an object within 40 cm
+    if (distance > 0 && distance < 40)
+    {
+        // Object detected, open the gate (move servo to 90 degrees)
+        Serial.println("Object detected: opening gate");
+        digitalWrite(BUZZER_PIN, HIGH);
+        delay(1000); // Turn on the buzzer
+        digitalWrite(BUZZER_PIN, LOW);
+        myServo.write(180); // Move servo to 90 degrees (open position)
+        delay(5000);        // Give time for servo to reach position
+        myServo.write(60);  // Move servo to 90 degrees (open position)
+        Serial.println("Gate closed");
     }
+    else
+    {
+        // No object detected, keep the gate closed
+        Serial.println("No object detected: clear");
+        digitalWrite(BUZZER_PIN, LOW); // Turn off the buzzer
+        myServo.write(60);             // Move servo to 0 degrees (closed position)
+    }
+
+    // Add a small delay to avoid overloading the sensor with readings
+    delay(500);
 }
